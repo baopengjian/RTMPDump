@@ -40,6 +40,9 @@ Java_com_cn_ray_rtmpdump_LivePusher_native_1init(JNIEnv *env, jobject instance) 
     videoChannel = new VideoChannel;
     videoChannel->setVideoCallback(callback);
 
+    audioChannel = new AudioChannel;
+    audioChannel->setAudioCallback(callback);
+
     //准备一个队列,打包好的数据 放入队列，在线程中统一的取出数据再发送给服务器
     packets.setReleaseCallback(releasePackets);
 
@@ -89,7 +92,7 @@ void *start(void *args) {
         readyPushing = 1;
         packets.setWork(1);
         //保证第一个数据是 aac解码数据包
-       // callback(audioChannel->getAudioTag());
+        callback(audioChannel->getAudioTag());
         RTMPPacket *packet = 0;
         while (readyPushing) {
             packets.pop(packet);
@@ -114,6 +117,7 @@ void *start(void *args) {
         }
         releasePackets(packet);
     } while (0);
+    //
     isStart = 0;
     readyPushing = 0;
     packets.setWork(0);
@@ -169,4 +173,35 @@ JNIEXPORT void JNICALL
 Java_com_cn_ray_rtmpdump_LivePusher_native_1release(JNIEnv *env, jobject instance) {
     DELETE(videoChannel);
     DELETE(audioChannel);
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_cn_ray_rtmpdump_LivePusher_native_1setAudioEncInfo(JNIEnv *env, jobject instance,
+                                                            jint sampleRateInHz,
+                                                            jint channelConfig) {
+
+    if(audioChannel){
+        audioChannel->setAudioEncInfo(sampleRateInHz,channelConfig);
+    }
+
+}extern "C"
+JNIEXPORT jint JNICALL
+Java_com_cn_ray_rtmpdump_LivePusher_getInputSamples(JNIEnv *env, jobject instance) {
+    if(audioChannel){
+        audioChannel->getInputSamples();
+    }
+    return -1;
+}
+
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_cn_ray_rtmpdump_LivePusher_native_1pushAudio(JNIEnv *env, jobject instance,
+                                                      jbyteArray data_) {
+    if (!audioChannel || !readyPushing) {
+        return;
+    }
+    jbyte *data = env->GetByteArrayElements(data_, NULL);
+    audioChannel->encodeData(data);
+    env->ReleaseByteArrayElements(data_, data, 0);
 }

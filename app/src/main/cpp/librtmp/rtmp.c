@@ -808,9 +808,9 @@ RTMP_Connect0(RTMP *r, struct sockaddr * service)
   if (r->m_sb.sb_socket != -1)
     {
 
-
+        SET_RCVTIMEO(tv, r->Link.timeout);
         if (setsockopt
-                (r->m_sb.sb_socket, SOL_SOCKET, SO_SNDTIMEO, (char *)&tv, sizeof(tv)))
+                (r->m_sb.sb_socket, SOL_SOCKET,SO_SNDTIMEO, (char *)&tv, sizeof(tv)))
         {
             RTMP_Log(RTMP_LOGERROR, "%s, Setting socket timeout to %ds failed!",
                      __FUNCTION__, r->Link.timeout);

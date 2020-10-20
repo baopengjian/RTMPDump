@@ -33,7 +33,7 @@ public class PlayActivity extends AppCompatActivity {
     }
 
     public void startLive(View view) {
-        livePusher.startLive("rtmp://47.75.90.219/myapp/mystream");
+        livePusher.startLive("rtmp://yourip/myapp/mystream");
     }
 
     public void stopLive(View view) {
@@ -46,6 +46,12 @@ public class PlayActivity extends AppCompatActivity {
             Manifest.permission.RECORD_AUDIO
     };
     private static final int REQUEST_EXTERNAL_STORAGE = 1;
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        livePusher.release();
+    }
 
     private void getPermission() {
         ActivityCompat.requestPermissions(this,

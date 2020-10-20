@@ -42,6 +42,12 @@ public class LivePusher {
         native_stop();
     }
 
+    public void release(){
+        videoChannel.release();
+        audioChannel.release();
+        native_release();
+    }
+
 
     public native void native_init();
 
@@ -49,7 +55,13 @@ public class LivePusher {
 
     public native void native_setVideoEncInfo(int width, int height, int fps, int bitrate);
 
+    public native void native_setAudioEncInfo(int sampleRateInHz, int channelConfig);
+
     public native void native_pushVideo(byte[] data);
+
+    public native void native_pushAudio(byte[] data);
+
+    public native int getInputSamples();
 
     public native void native_stop();
 

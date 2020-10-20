@@ -74,7 +74,6 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
             mCamera.setPreviewCallbackWithBuffer(this);
             //设置预览画面
             mCamera.setPreviewDisplay(mSurfaceHolder);
-            mOnChangedSizeListener.onChanged(mWidth, mHeight);
             mCamera.startPreview();
         } catch (Exception ex) {
             ex.printStackTrace();
@@ -89,18 +88,15 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
         switch (mRotation) {
             case Surface.ROTATION_0:
                 degrees = 0;
-                mOnChangedSizeListener.onChanged(mHeight,mWidth);
+                mOnChangedSizeListener.onChanged(mHeight, mWidth);
                 break;
             case Surface.ROTATION_90: // 横屏 左边是头部(home键在右边)
                 degrees = 90;
-                mOnChangedSizeListener.onChanged(mWidth,mHeight);
-                break;
-            case Surface.ROTATION_180:
-                degrees = 180;
+                mOnChangedSizeListener.onChanged(mWidth, mHeight);
                 break;
             case Surface.ROTATION_270:// 横屏 头部在右边
                 degrees = 270;
-                mOnChangedSizeListener.onChanged(mWidth,mHeight);
+                mOnChangedSizeListener.onChanged(mWidth, mHeight);
                 break;
         }
         int result;
@@ -181,7 +177,6 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
             case Surface.ROTATION_270:// 横屏 头部在右边
                 break;
         }
-
         // data数据依然是倒的
         mPreviewCallback.onPreviewFrame(bytes, camera);
         camera.addCallbackBuffer(buffer);
@@ -210,8 +205,7 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
                     bytes[index++] = data[ySize + mWidth * j + i + 1];
                 }
             }
-        }else {
-
+        } else {
             //逆时针旋转90度
             for (int i = 0; i < mWidth; i++) {
                 int nPos = mWidth - 1;
@@ -220,7 +214,6 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
                     nPos += mWidth;
                 }
             }
-
             //u v
             for (int i = 0; i < mWidth; i += 2) {
                 int nPos = ySize + mWidth - 1;
@@ -231,11 +224,16 @@ public class CameraHelper implements SurfaceHolder.Callback, Camera.PreviewCallb
                 }
             }
         }
-
     }
+
 
     public void setOnChangedSizeListener(OnChangedSizeListener listener) {
         mOnChangedSizeListener = listener;
+    }
+
+    public void release() {
+        mSurfaceHolder.removeCallback(this);
+        stopPreview();
     }
 
     public interface OnChangedSizeListener {

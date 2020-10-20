@@ -10,11 +10,11 @@ import com.cn.ray.rtmpdump.LivePusher;
 public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChangedSizeListener {
 
 
-    private LivePusher mLivePusher;
-    private CameraHelper cameraHelper;
-    private int mBitrate;
-    private int mFps;
-    private boolean isLiving;
+        private LivePusher mLivePusher;
+        private CameraHelper cameraHelper;
+        private int mBitrate;
+        private int mFps;
+        private boolean isLiving;
 
     public VideoChannel(LivePusher livePusher, Activity activity, int width, int height, int bitrate, int fps, int cameraId) {
         mLivePusher = livePusher;
@@ -41,7 +41,7 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
         if (isLiving) {
-     //       mLivePusher.native_pushVideo(data);
+            mLivePusher.native_pushVideo(data);
         }
     }
 
@@ -57,7 +57,7 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
     @Override
     public void onChanged(int w, int h) {
         //初始化编码器
-       mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
+        mLivePusher.native_setVideoEncInfo(w, h, mFps, mBitrate);
     }
 
     public void startLive() {
@@ -66,5 +66,9 @@ public class VideoChannel implements Camera.PreviewCallback, CameraHelper.OnChan
 
     public void stopLive() {
         isLiving = false;
+    }
+
+    public void release() {
+        cameraHelper.release();
     }
 }

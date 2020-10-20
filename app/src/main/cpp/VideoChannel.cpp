@@ -1,19 +1,21 @@
-//
-// Created by PF0ZYBAJ on 2020-10-11.
-//
-#ifndef PUSHER_VIDEOCHANNEL_H
-#define PUSHER_VIDEOCHANNEL_H
-
 #include "VideoChannel.h"
 #include "librtmp/rtmp.h"
 #include "macro.h"
 
 VideoChannel::VideoChannel() {
-    pthread_mutex_init(&mutex,0);
+    pthread_mutex_init(&mutex, 0);
 }
 
 VideoChannel::~VideoChannel() {
     pthread_mutex_destroy(&mutex);
+    if (videoCodec) {
+        x264_encoder_close(videoCodec);
+        videoCodec = 0;
+    }
+    if (pic_in) {
+        x264_picture_clean(pic_in);
+        DELETE(pic_in);
+    }
 }
 
 void VideoChannel::setVideoEncInfo(int width, int height, int fps, int bitrate) {
@@ -30,9 +32,9 @@ void VideoChannel::setVideoEncInfo(int width, int height, int fps, int bitrate) 
     }
     if (pic_in) {
         x264_picture_clean(pic_in);
-        delete pic_in;
-        pic_in = 0;
+        DELETE(pic_in);
     }
+
 
     //打开x264编码器
     //x264编码器的属性
@@ -188,7 +190,7 @@ void VideoChannel::sendFrame(int type, uint8_t *payload, int i_payload) {
     RTMPPacket_Alloc(packet, bodySize);
 
     packet->m_body[0] = 0x27;
-    if(type == NAL_SLICE_IDR){
+    if (type == NAL_SLICE_IDR) {
         packet->m_body[0] = 0x17;
         LOGE("关键帧");
     }
@@ -214,4 +216,3 @@ void VideoChannel::sendFrame(int type, uint8_t *payload, int i_payload) {
     packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
     videoCallback(packet);
 }
-#endif //PUSHER_VIDEOCHANNEL_H
