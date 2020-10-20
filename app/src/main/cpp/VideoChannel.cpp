@@ -1,6 +1,8 @@
 //
 // Created by PF0ZYBAJ on 2020-10-11.
 //
+#ifndef PUSHER_VIDEOCHANNEL_H
+#define PUSHER_VIDEOCHANNEL_H
 
 #include "VideoChannel.h"
 #include "librtmp/rtmp.h"
@@ -77,3 +79,139 @@ void VideoChannel::setVideoEncInfo(int width, int height, int fps, int bitrate) 
     x264_picture_alloc(pic_in, X264_CSP_I420, width, height);
     pthread_mutex_unlock(&mutex);
 }
+
+void VideoChannel::setVideoCallback(VideoCallback videoCallback) {
+    this->videoCallback = videoCallback;
+}
+
+void VideoChannel::encodeData(int8_t *data) {
+    pthread_mutex_lock(&mutex);
+    //y数据
+    memcpy(pic_in->img.plane[0], data, ySize);
+    for (int i = 0; i < uvSize; ++i) {
+        //u数据
+        *(pic_in->img.plane[1] + i) = *(data + ySize + i * 2 + 1);
+        *(pic_in->img.plane[2] + i) = *(data + ySize + i * 2);
+    }
+    //编码出来的数据  （帧数据）
+    x264_nal_t *pp_nal;
+    //编码出来有几个数据 （多少帧）
+    int pi_nal;
+    x264_picture_t pic_out;
+    x264_encoder_encode(videoCodec, &pp_nal, &pi_nal, pic_in, &pic_out);
+    //如果是关键帧 3
+    int sps_len;
+    int pps_len;
+    uint8_t sps[100];
+    uint8_t pps[100];
+    for (int i = 0; i < pi_nal; ++i) {
+        if (pp_nal[i].i_type == NAL_SPS) {
+            //排除掉 h264的间隔 00 00 00 01
+            sps_len = pp_nal[i].i_payload - 4;
+            memcpy(sps, pp_nal[i].p_payload + 4, sps_len);
+        } else if (pp_nal[i].i_type == NAL_PPS) {
+            pps_len = pp_nal[i].i_payload - 4;
+            memcpy(pps, pp_nal[i].p_payload + 4, pps_len);
+            //pps肯定是跟着sps的
+            sendSpsPps(sps, pps, sps_len, pps_len);
+        } else {
+            sendFrame(pp_nal[i].i_type, pp_nal[i].p_payload, pp_nal[i].i_payload);
+        }
+    }
+    pthread_mutex_unlock(&mutex);
+}
+
+void VideoChannel::sendSpsPps(uint8_t *sps, uint8_t *pps, int sps_len, int pps_len) {
+    //看表
+    int bodySize = 13 + sps_len + 3 + pps_len;
+    RTMPPacket *packet = new RTMPPacket;
+    //
+    RTMPPacket_Alloc(packet, bodySize);
+    int i = 0;
+    //固定头
+    packet->m_body[i++] = 0x17;
+    //类型
+    packet->m_body[i++] = 0x00;
+    //composition time 0x000000
+    packet->m_body[i++] = 0x00;
+    packet->m_body[i++] = 0x00;
+    packet->m_body[i++] = 0x00;
+
+    //版本
+    packet->m_body[i++] = 0x01;
+    //编码规格
+    packet->m_body[i++] = sps[1];
+    packet->m_body[i++] = sps[2];
+    packet->m_body[i++] = sps[3];
+    packet->m_body[i++] = 0xFF;
+
+    //整个sps
+    packet->m_body[i++] = 0xE1;
+    //sps长度
+    packet->m_body[i++] = (sps_len >> 8) & 0xff;
+    packet->m_body[i++] = sps_len & 0xff;
+    memcpy(&packet->m_body[i], sps, sps_len);
+    i += sps_len;
+
+    //pps
+    packet->m_body[i++] = 0x01;
+    packet->m_body[i++] = (pps_len >> 8) & 0xff;
+    packet->m_body[i++] = (pps_len) & 0xff;
+    memcpy(&packet->m_body[i], pps, pps_len);
+
+    //视频
+    packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    packet->m_nBodySize = bodySize;
+    //随意分配一个管道（尽量避开rtmp.c中使用的）
+    packet->m_nChannel = 10;
+    //sps pps没有时间戳
+    packet->m_nTimeStamp = 0;
+    //不使用绝对时间
+    packet->m_hasAbsTimestamp = 0;
+    packet->m_headerType = RTMP_PACKET_SIZE_MEDIUM;
+
+    videoCallback(packet);
+}
+
+void VideoChannel::sendFrame(int type, uint8_t *payload, int i_payload) {
+    if (payload[2] == 0x00) {
+        i_payload -= 4;
+        payload += 4;
+    } else {
+        i_payload -= 3;
+        payload += 3;
+    }
+    //看表
+    int bodySize = 9 + i_payload;
+    RTMPPacket *packet = new RTMPPacket;
+    //
+    RTMPPacket_Alloc(packet, bodySize);
+
+    packet->m_body[0] = 0x27;
+    if(type == NAL_SLICE_IDR){
+        packet->m_body[0] = 0x17;
+        LOGE("关键帧");
+    }
+    //类型
+    packet->m_body[1] = 0x01;
+    //时间戳
+    packet->m_body[2] = 0x00;
+    packet->m_body[3] = 0x00;
+    packet->m_body[4] = 0x00;
+    //数据长度 int 4个字节
+    packet->m_body[5] = (i_payload >> 24) & 0xff;
+    packet->m_body[6] = (i_payload >> 16) & 0xff;
+    packet->m_body[7] = (i_payload >> 8) & 0xff;
+    packet->m_body[8] = (i_payload) & 0xff;
+
+    //图片数据
+    memcpy(&packet->m_body[9], payload, i_payload);
+
+    packet->m_hasAbsTimestamp = 0;
+    packet->m_nBodySize = bodySize;
+    packet->m_packetType = RTMP_PACKET_TYPE_VIDEO;
+    packet->m_nChannel = 0x10;
+    packet->m_headerType = RTMP_PACKET_SIZE_LARGE;
+    videoCallback(packet);
+}
+#endif //PUSHER_VIDEOCHANNEL_H

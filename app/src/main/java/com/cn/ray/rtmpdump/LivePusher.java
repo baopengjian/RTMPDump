@@ -19,7 +19,7 @@ public class LivePusher {
 
         native_init();
         videoChannel = new VideoChannel(this,activity, width, height, bitrate, fps, cameraId);
-        audioChannel = new AudioChannel();
+        audioChannel = new AudioChannel(this);
     }
 
     public void setPreviewDisplay(SurfaceHolder surfaceHolder) {
@@ -31,7 +31,7 @@ public class LivePusher {
     }
 
     public void startLive(String path) {
-//        native_start(path);
+        native_start(path);
         videoChannel.startLive();
         audioChannel.startLive();
     }
@@ -39,7 +39,7 @@ public class LivePusher {
     public void stopLive(){
         videoChannel.stopLive();
         audioChannel.stopLive();
-    //    native_stop();
+        native_stop();
     }
 
 
